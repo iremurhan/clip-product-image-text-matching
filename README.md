@@ -1,170 +1,70 @@
-# **FineTuneCLIP-Ecommerce: Detecting Misaligned Product Images in E-Commerce Reviews**
+# CLIP Product Image–Text Matching
 
-## **Overview**
-`FineTuneCLIP-Ecommerce` is a project focused on fine-tuning the pre-trained CLIP (Contrastive Language–Image Pretraining) model to detect misaligned images in the context of e-commerce platforms. By using a curated dataset of product images and user-uploaded review images, this project demonstrates how multi-modal models like CLIP can be adapted for real-world data.
+Fine-tuning CLIP (ViT-B/32) to decide whether a product image and a product title belong together, using two objectives: a cross-entropy pair classifier and a margin-based contrastive loss.
 
-The experiments were initially conducted in Jupyter notebooks for quick iteration and analysis. Afterward, the project structure was reorganized into a modular format for improved maintainability and scalability.
+Term project for CMPE 586 (Transformer-Based Pre-Training Methods in NLP), Boğaziçi University, Fall 2024. The original report is in [`docs/report.pdf`](docs/report.pdf).
 
----
+## Task
 
-## **Features**
-- **Fine-tuning CLIP**: Models fine-tuned with both contrastive and cross-entropy losses to detect semantic misalignment.
-- **Noisy Dataset Handling**: Dataset curated from Trendyol product links, combining official product images with user-uploaded review images.
-- **Comprehensive Evaluation**: Metrics such as accuracy, F1-score, and classification reports to assess performance.
-- **Modular Design**: Project refactored into multiple Python modules for better organization and usability.
+Each example is an (image, title) pair labelled **aligned** (the product's own title) or **misaligned** (the title of a random product that shares no category with it). The motivation is flagging listings or user-uploaded photos that do not match the product they are attached to.
 
----
+## Data
 
-## **Directory Structure**
-```plaintext
-FineTuneCLIP-Ecommerce/
-│
-├── .venv/                              # Virtual environment folder (ignored in version control)
-│
-├── checkpoints/                        # Saved model checkpoints
-│   ├── clip_checkpoint.pth
-│   ├── clip_fine_tune_checkpoint.pth
-│   └── clip_fine_tuned_epoch_3.pth
-│
-├── configs/                            # Configuration files
-│   └── config.yaml
-│
-├── data/                               # Dataset and processed JSON files
-│   ├── aligned_pairs.json
-│   ├── misaligned_pairs.json
-│   ├── train_pairs.json
-│   ├── test_pairs.json
-│   └── updated_trendyol_dataset_with_images.csv
-│
-├── notebooks/                          # Jupyter notebooks for experimentation
-│   └── exploration.ipynb
-│
-├── src/                                # Python modules for the project
-│   ├── __init__.py                     # Package initialization
-│   ├── data_preparation.py             # Dataset preparation logic
-│   ├── dataset.py                      # Dataset class and data loaders
-│   ├── evaluation.py                   # Evaluation and metrics
-│   ├── models.py                       # Model architecture definitions
-│   ├── training.py                     # Training logic
-│   └── utils.py                        # Helper functions (e.g., config loading)
-│
-├── main.py                             # Main script for running the project
-├── README.md                           # Documentation (this file)
-└── requirements.txt                    # Python dependencies
+Not included in this repository. Data comes from the public Kaggle dataset [Trendyol Product Dataset](https://www.kaggle.com/datasets/bilalelebi/trendyol-product-dataset) (product links, titles, categories). `notebooks/exploration.ipynb` (section 2) downloads each product's main image from its product page and writes `data/updated_trendyol_dataset_with_images.csv`. The original run produced 23,036 aligned and 23,036 misaligned pairs.
+
+## Method
+
+| Model | What is trained | Prediction |
+|---|---|---|
+| Zero-shot | nothing | cosine(image, title) > threshold → aligned |
+| Cross-entropy | all CLIP weights + a 1→2 linear head on the cosine similarity | argmax of the head |
+| Contrastive | all CLIP weights, loss `(1−s)²` for aligned and `max(0, s−m)²` for misaligned pairs (m = 0.2) | cosine > threshold → aligned |
+
+The train/test split is **image-disjoint** (`GroupShuffleSplit` on the image path), because every image appears in both an aligned and a misaligned pair.
+
+## Usage
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+python main.py prepare                                   # pairs + image-disjoint split
+python main.py train --loss ce                           # or --loss contrastive
+python main.py evaluate --model ce --checkpoint checkpoints/ce_epoch3.pth
+python main.py evaluate --model contrastive --checkpoint checkpoints/contrastive_epoch3.pth
+python main.py evaluate --model zero-shot --threshold 0.25
 ```
 
----
+Evaluation reports accuracy, macro-F1 and ROC-AUC (threshold-independent, so the zero-shot model can be compared fairly). Settings live in `configs/config.yaml`. Checkpoints are written to `checkpoints/`, which is git-ignored.
 
-## **Installation and Setup**
-
-1. **Clone the Repository**
-   ```bash
-   git clone https://github.com/iremurhan/FineTuneCLIP-Ecommerce.git
-   cd FineTuneCLIP-Ecommerce
-   ```
-
-2. **Create a Virtual Environment**
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate    # On Windows: .venv\Scripts\activate
-   ```
-
-3. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Download the Pretrained CLIP Model**
-   ```bash
-   transformers-cli download openai/clip-vit-base-patch32
-   ```
-
----
-
-## **Configuration**
-
-All configurable paths and parameters are stored in `configs/config.yaml`. Update this file to customize your project settings.
-
-**Example Configuration:**
-```yaml
-data:
-  product_image_dir: "data/product_images"
-  review_image_dir: "data/review_images"
-  dataset_file: "data/updated_trendyol_dataset_with_images.csv"
-  aligned_pairs: "data/aligned_pairs.json"
-  misaligned_pairs: "data/misaligned_pairs.json"
-  train_pairs: "data/train_pairs.json"
-  test_pairs: "data/test_pairs.json"
-
-model:
-  pretrained_model: "openai/clip-vit-base-patch32"
-  batch_size: 32
-  learning_rate: 1e-5
-  epochs: 3
-
-evaluation:
-  threshold: 0.4
+```bash
+pytest -q    # unit tests; no images, network or CLIP weights needed
 ```
 
----
+## Results
 
-## **Usage**
+**Original course run (Jan 2025, notebook):** these numbers are kept for the record, but they are **not a valid measure of generalisation**:
 
-1. **Prepare the Dataset**
-   Prepare aligned and misaligned pairs, then split them into train/test sets:
-   ```bash
-   python main.py --prepare-data
-   ```
+| Model | Accuracy | F1 |
+|---|---|---|
+| Cross-entropy | 0.848 | 0.836 (binary, misaligned class) |
+| Contrastive | 0.790 | 0.790 (weighted) |
 
-2. **Train the Model**
-   Fine-tune the CLIP model:
-   ```bash
-   python main.py --train
-   ```
+Known problems with that run, found when this repository was cleaned up:
 
-3. **Evaluate the Model**
-   Run evaluation on the test dataset:
-   ```bash
-   python main.py --evaluate
-   ```
+1. **Train/test leakage.** The split was random over pairs, so 90.5% of test images (and 78.8% of test titles) also appeared in training.
+2. **Inverted contrastive labels.** The dataset used 0 = aligned, while the loss expected 1 = aligned. The contrastive model therefore learned to make *misaligned* pairs similar, and its threshold rule was inverted to match. Its accuracy is real, but it does not reflect better image–text alignment.
+3. **Metrics are not comparable.** The two F1 scores use different averaging, and the zero-shot baseline listed in the report is not in the notebook.
 
----
+All three are fixed in the current code. Results on the image-disjoint split have **not been re-run yet**.
 
-## **Experiments**
+## Repository layout
 
-All initial experiments were conducted in the Jupyter notebook located in the `notebooks/` folder:
-
-- **`exploration.ipynb`**: Includes early experimentation with fine-tuning and evaluation using contrastive and cross-entropy loss functions.
-
-After completing the notebook-based experiments, the project was modularized into Python scripts for better scalability and maintainability.
-
----
-
-## **Results**
-
-The table below summarizes the results from the fine-tuning experiments:
-
-| Model                          | Accuracy | F1-Score | Precision (Aligned/Misaligned) | Recall (Aligned/Misaligned) |
-|--------------------------------|----------|----------|---------------------------------|-----------------------------|
-| Original CLIP                 | 0.68     | 0.65     | 0.70 / 0.65                    | 0.60 / 0.70                |
-| Fine-Tuned CLIP (Contrastive) | 0.79     | 0.79     | 0.76 / 0.82                    | 0.84 / 0.74                |
-| Fine-Tuned CLIP (Cross-Entropy) | 0.85    | 0.84     | 0.80 / 0.91                    | 0.92 / 0.78                |
-
-### **Observations:**
-- Fine-tuning with cross-entropy loss provided the best overall performance for binary classification.
-- Contrastive loss performed slightly worse but retained robust embedding alignment for similarity-based tasks.
-
----
-
-## **Acknowledgments**
-
-This project uses the Trendyol Product Dataset for experiments.
-This is the term project of the CMPE 586 Sp. Tp. Transformer-Based Pretraining Methods in Natural Language Processing, lectured by Onur Güngör at Bogazici University Computer Engineering Department.
-
----
-
-## **Contributors**
-
-- **Beyza İrem Urhan**  
-  Bogazici University  
-  [beyza.urhan@bogazici.edu.tr](mailto:beyza.urhan@bogazici.edu.tr)
+```
+main.py                 CLI: prepare / train / evaluate
+configs/config.yaml     paths and hyper-parameters
+src/                    data preparation, dataset, models, loss, training, evaluation
+tests/                  unit tests
+notebooks/              original exploration notebook (data collection, first experiments)
+docs/report.pdf         course report
+```
