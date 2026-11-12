@@ -50,13 +50,13 @@ pytest -q    # unit tests; no images, network or CLIP weights needed
 | Cross-entropy | 0.848 | 0.836 (binary, misaligned class) |
 | Contrastive | 0.790 | 0.790 (weighted) |
 
-Known problems with that run, found when this repository was cleaned up:
+Known problems with that run:
 
 1. **Train/test leakage.** The split was random over pairs, so 90.5% of test images (and 78.8% of test titles) also appeared in training.
 2. **Inverted contrastive labels.** The dataset used 0 = aligned, while the loss expected 1 = aligned. The contrastive model therefore learned to make *misaligned* pairs similar, and its threshold rule was inverted to match. Its accuracy is real, but it does not reflect better image–text alignment.
 3. **Metrics are not comparable.** The two F1 scores use different averaging, and the zero-shot baseline listed in the report is not in the notebook.
 
-All three are fixed in the current code. Results on the image-disjoint split have **not been re-run yet**.
+All three are fixed in the current code. Results on the image-disjoint split will be added.
 
 ## Repository layout
 
