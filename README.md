@@ -41,22 +41,13 @@ Evaluation reports accuracy, macro-F1 and ROC-AUC (threshold-independent, so the
 pytest -q    # unit tests; no images, network or CLIP weights needed
 ```
 
-## Results
+## Evaluation protocol
 
-**Original course run (Jan 2025, notebook):** these numbers are kept for the record, but they are **not a valid measure of generalisation**:
+- **Image-disjoint split.** Each product image occurs in one aligned and one misaligned pair, so pairs are grouped by image before splitting. No test image is seen during training.
+- **Label convention.** 0 = aligned, 1 = misaligned throughout data preparation, both losses and evaluation; the contrastive loss pulls aligned pairs together and pushes misaligned pairs below the margin.
+- **Comparable metrics.** All three models are scored with accuracy, macro-F1 and ROC-AUC on the same test split. ROC-AUC uses the continuous score of each model, so the zero-shot baseline does not depend on a hand-picked threshold.
 
-| Model | Accuracy | F1 |
-|---|---|---|
-| Cross-entropy | 0.848 | 0.836 (binary, misaligned class) |
-| Contrastive | 0.790 | 0.790 (weighted) |
-
-Known problems with that run:
-
-1. **Train/test leakage.** The split was random over pairs, so 90.5% of test images (and 78.8% of test titles) also appeared in training.
-2. **Inverted contrastive labels.** The dataset used 0 = aligned, while the loss expected 1 = aligned. The contrastive model therefore learned to make *misaligned* pairs similar, and its threshold rule was inverted to match. Its accuracy is real, but it does not reflect better image–text alignment.
-3. **Metrics are not comparable.** The two F1 scores use different averaging, and the zero-shot baseline listed in the report is not in the notebook.
-
-All three are fixed in the current code. Results on the image-disjoint split will be added.
+The original course notebook (`notebooks/`, Jan 2025) split pairs at random, so most test images also appeared in training, and its contrastive model used the opposite label convention. Its scores, reported in `docs/report.pdf`, are therefore not comparable with this code.
 
 ## Repository layout
 
