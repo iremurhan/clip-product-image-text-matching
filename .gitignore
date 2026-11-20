@@ -1,0 +1,17 @@
+# Data and model artifacts are never committed
+data/
+checkpoints/
+*.pth
+*.pt
+*.safetensors
+
+# Python / environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

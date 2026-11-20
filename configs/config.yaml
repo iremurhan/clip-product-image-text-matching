@@ -1,0 +1,26 @@
+seed: 42
+checkpoint_dir: "checkpoints"   # git-ignored
+num_workers: 0
+
+data:
+  # Kaggle "Trendyol Product Dataset" with image paths added by
+  # `python main.py download`; not included in this repository.
+  products_file: "data/prepared_all_products.csv"
+  image_dir: "data/product_images"
+  dataset_file: "data/updated_trendyol_dataset_with_images.csv"
+  aligned_pairs: "data/aligned_pairs.json"
+  misaligned_pairs: "data/misaligned_pairs.json"
+  train_pairs: "data/train_pairs.json"
+  test_pairs: "data/test_pairs.json"
+  test_size: 0.2
+
+model:
+  pretrained_model: "openai/clip-vit-base-patch32"
+  batch_size: 32
+  epochs: 3
+  lr_ce: 1.0e-5
+  lr_contrastive: 1.0e-6
+  margin: 0.2
+
+evaluation:
+  threshold: 0.5   # cosine similarity above this -> aligned (zero-shot and contrastive)
